@@ -1,36 +1,103 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Clinica Cultural y Linguistica de Espanol
 
-## Getting Started
+Herramienta digital para el **Centro de Lenguas Modernas (CLM)** de la Universidad de Granada.
 
-First, run the development server:
+Implementa la metodologia propia **"Clinica Cultural y Linguistica"**, que trata al estudiante como un "paciente linguistico" al que se le diagnostica y trata para mejorar su produccion oral en espanol mediante inmersion cultural profunda. Dirigida especificamente a estudiantes universitarios asiaticos.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Stack tecnologico
+
+| Capa | Tecnologia |
+|---|---|
+| Frontend | Next.js 14 (App Router), React, TypeScript |
+| Estilos | Tailwind CSS + Shadcn/UI |
+| Backend | API Routes de Next.js |
+| Base de datos | PostgreSQL (Railway) + Prisma ORM |
+| Autenticacion | NextAuth.js (Google, Apple) |
+| Media | Cloudinary (video/audio) |
+| Hosting | Vercel |
+
+## Modelo de datos
+
+```
+User (TEACHER / STUDENT)
+  ├── accessCode          → Codigo unico del profesor para registrarse
+  ├── nativeLanguage      → Idioma nativo del paciente
+  └── spanishLevel        → Nivel de espanol
+
+AccessCode                → Codigos generados por el profesor (uso unico)
+
+Activity (POESIA / CUENTO / CANCION / ESCENA)
+  ├── content             → Texto de la actividad
+  ├── culturalHints       → JSON: fonetica, traduccion, contexto cultural
+  └── instructions        → Instrucciones para la grabacion
+
+Submission
+  ├── mediaUrl            → Video/audio del estudiante (Cloudinary)
+  ├── status              → PENDING / REVIEWED / NEEDS_REVISION
+  └── @@unique(student + activity)
+
+Feedback ("Tratamiento")
+  ├── comment             → Correccion escrita del profesor
+  ├── audioUrl            → Audio de respuesta del profesor (Cloudinary)
+  └── pronunciation / fluency / culturalUse → Puntuacion 1-5
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Inicio rapido
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# 1. Clonar e instalar
+git clone <repo-url>
+cd clinica-oral-clm
+npm install
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# 2. Configurar variables de entorno
+cp .env.example .env
+# Editar .env con tus credenciales
 
-## Learn More
+# 3. Configurar base de datos
+npx prisma db push
 
-To learn more about Next.js, take a look at the following resources:
+# 4. Ejecutar en desarrollo
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Scripts disponibles
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Comando | Descripcion |
+|---|---|
+| `npm run dev` | Servidor de desarrollo |
+| `npm run build` | Build de produccion (genera Prisma + Next.js) |
+| `npm run lint` | Linting con ESLint |
+| `npm run db:push` | Sincronizar schema con la base de datos |
+| `npm run db:studio` | Abrir Prisma Studio (GUI de la BD) |
 
-## Deploy on Vercel
+## Variables de entorno
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Ver `.env.example` para la lista completa. Requiere:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `DATABASE_URL` — PostgreSQL connection string (Railway)
+- `NEXTAUTH_URL` + `NEXTAUTH_SECRET` — NextAuth.js
+- `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` — OAuth Google
+- `APPLE_ID` + `APPLE_TEAM_ID` + `APPLE_PRIVATE_KEY` + `APPLE_KEY_ID` — OAuth Apple
+- `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` + `CLOUDINARY_API_KEY` + `CLOUDINARY_API_SECRET` — Cloudinary
+
+## Estructura del proyecto
+
+```
+src/
+├── app/
+│   ├── api/auth/[...nextauth]/   → NextAuth route handler
+│   ├── globals.css               → Tailwind + Shadcn CSS variables
+│   ├── layout.tsx                → Root layout (lang="es")
+│   └── page.tsx                  → Landing page
+├── components/ui/                → Componentes Shadcn/UI
+├── lib/
+│   ├── auth.ts                   → Configuracion NextAuth
+│   ├── db.ts                     → Prisma client singleton
+│   └── utils.ts                  → Utilidad cn() para clases
+├── hooks/                        → Custom React hooks
+└── types/
+    └── next-auth.d.ts            → Type augmentations (role, accessCode)
+prisma/
+└── schema.prisma                 → Schema completo de la BD
+```
