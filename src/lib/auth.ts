@@ -4,9 +4,11 @@ import AppleProvider from "next-auth/providers/apple";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
+import { Role } from "@prisma/client";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(db) as NextAuthOptions["adapter"],
+  session: { strategy: "jwt" },
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -68,15 +70,26 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
 
-    async session({ session, user }) {
-      if (session.user) {
-        session.user.id = user.id;
+    async jwt({ token, user }) {
+      if (user) {
         const dbUser = await db.user.findUnique({
-          where: { id: user.id },
-          select: { role: true, accessCode: true },
+          where: { email: user.email! },
+          select: { id: true, role: true, accessCode: true },
         });
-        session.user.role = dbUser?.role ?? "STUDENT";
-        session.user.hasAccessCode = !!dbUser?.accessCode;
+        if (dbUser) {
+          token.id = dbUser.id;
+          token.role = dbUser.role;
+          token.hasAccessCode = !!dbUser.accessCode;
+        }
+      }
+      return token;
+    },
+
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.id = token.id as string;
+        session.user.role = (token.role as Role) ?? "STUDENT";
+        session.user.hasAccessCode = (token.hasAccessCode as boolean) ?? false;
       }
       return session;
     },
