@@ -16,7 +16,7 @@ export default function SignInPage() {
     setError("");
     try {
       await signIn("google", { callbackUrl: "/dashboard" });
-    } catch (err) {
+    } catch (_err) {
       setError("Error al iniciar sesión con Google");
       setIsLoading(false);
     }
@@ -27,7 +27,7 @@ export default function SignInPage() {
     setError("");
     try {
       await signIn("apple", { callbackUrl: "/dashboard" });
-    } catch (err) {
+    } catch (_err) {
       setError("Error al iniciar sesión con Apple");
       setIsLoading(false);
     }
@@ -58,7 +58,7 @@ export default function SignInPage() {
       } else {
         setError(data.error || "Error al iniciar sesión");
       }
-    } catch (err) {
+    } catch (_err) {
       setError("Error al conectar con el servidor");
     } finally {
       setIsLoading(false);
