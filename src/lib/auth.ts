@@ -21,6 +21,26 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
+    async signIn({ user, account }) {
+      if (!user.email) return false;
+
+      // Asignar rol automáticamente basado en el email
+      const email = user.email.toLowerCase();
+      const isUniversityEmail = email.endsWith("@ugr.es") || email.endsWith("@go.ugr.es");
+
+      // Crear o actualizar el usuario con el rol correcto
+      await db.user.upsert({
+        where: { email },
+        update: { role: isUniversityEmail ? "TEACHER" : "STUDENT" },
+        create: {
+          email,
+          name: user.name,
+          role: isUniversityEmail ? "TEACHER" : "STUDENT",
+        },
+      });
+
+      return true;
+    },
     async session({ session, user }) {
       if (session.user) {
         session.user.id = user.id;

@@ -3,59 +3,42 @@
 // CLM - Universidad de Granada
 // =============================================================
 
-import { PrismaClient, Role } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
 async function main() {
   console.log('🌱 Starting database seed...')
 
-  // 1. Crear usuario PROFESOR
-  console.log('📚 Creating TEACHER user...')
-  const teacher = await prisma.user.upsert({
-    where: { email: 'profe@clm.ugr.es' },
-    update: {},
-    create: {
-      email: 'profe@clm.ugr.es',
-      name: 'Profe Prueba',
-      role: Role.TEACHER,
-    },
-  })
-  console.log(`   ✅ TEACHER created: ${teacher.email}`)
+  // Crear códigos de acceso para estudiantes
+  console.log('🔑 Creating AccessCodes for students...')
+  const codes = [
+    { code: 'CLINICA2024', isUsed: false },
+    { code: 'ESPAÑOL2024', isUsed: false },
+    { code: 'GRANADA2024', isUsed: false },
+  ]
 
-  // 2. Crear usuario ADMIN
-  console.log('🔐 Creating ADMIN user...')
-  const admin = await prisma.user.upsert({
-    where: { email: 'benitezl@go.ugr.es' },
-    update: {},
-    create: {
-      email: 'benitezl@go.ugr.es',
-      name: 'Javier Benítez',
-      role: Role.TEACHER, // ADMIN no existe en el enum, usando TEACHER
-    },
-  })
-  console.log(`   ✅ ADMIN created: ${admin.email}`)
-
-  // 3. Crear código de acceso para estudiantes
-  console.log('🔑 Creating AccessCode for students...')
-  const accessCode = await prisma.accessCode.upsert({
-    where: { code: 'CLINICA2024' },
-    update: {},
-    create: {
-      code: 'CLINICA2024',
-      isUsed: false,
-    },
-  })
-  console.log(`   ✅ AccessCode created: ${accessCode.code}`)
+  for (const codeData of codes) {
+    const accessCode = await prisma.accessCode.upsert({
+      where: { code: codeData.code },
+      update: {},
+      create: codeData,
+    })
+    console.log(`   ✅ AccessCode created: ${accessCode.code}`)
+  }
 
   console.log('✨ Database seed completed successfully!')
   console.log('')
   console.log('────────────────────────────────────────────────────────────')
-  console.log('📋 CREDENTIALS CREATED:')
+  console.log('📋 ACCESS CODES CREATED:')
   console.log('────────────────────────────────────────────────────────────')
-  console.log(`  👨‍🏫 TEACHER:   profe@clm.ugr.es`)
-  console.log(`  🔐 ADMIN:      benitezl@go.ugr.es`)
-  console.log(`  🔑 CODE:       CLINICA2024`)
+  console.log(`  🔑 CLINICA2024`)
+  console.log(`  🔑 ESPAÑOL2024`)
+  console.log(`  🔑 GRANADA2024`)
+  console.log('────────────────────────────────────────────────────────────')
+  console.log('')
+  console.log('👨‍🏫 TEACHERS: Use your @ugr.es or @go.ugr.es email')
+  console.log('👨‍🎓 STUDENTS: Register with any email, then use a code')
   console.log('────────────────────────────────────────────────────────────')
 }
 
