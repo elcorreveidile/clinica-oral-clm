@@ -21,41 +21,32 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async signIn({ user, account }) {
-      if (!user.email) return false;
-
-      // Si es email de la universidad y no tiene rol, asignar TEACHER
-      const emailLower = user.email.toLowerCase();
-      const isUniversityEmail = emailLower.endsWith("@ugr.es") || emailLower.endsWith("@go.ugr.es");
-
-      const existingUser = await db.user.findUnique({
-        where: { email: emailLower },
-      });
-
-      if (existingUser && existingUser.role === "STUDENT" && isUniversityEmail) {
-        // Actualizar a TEACHER si es email universitario
-        await db.user.update({
-          where: { email: emailLower },
-          data: { role: "TEACHER" },
-        });
-      } else if (!existingUser && isUniversityEmail) {
-        // Es primer registro de email universitario, actualizar rol a TEACHER
-        await db.user.update({
-          where: { email: emailLower },
-          data: { role: "TEACHER" },
-        });
-      }
-
-      return true;
-    },
     async session({ session, user }) {
       if (session.user) {
         session.user.id = user.id;
         const dbUser = await db.user.findUnique({
           where: { id: user.id },
-          select: { role: true, accessCode: true },
+          select: { role: true, accessCode: true, email: true },
         });
-        session.user.role = dbUser?.role ?? "STUDENT";
+
+        // Si es email universitario y es STUDENT, promover a TEACHER
+        if (dbUser?.email && dbUser.role === "STUDENT") {
+          const emailLower = dbUser.email.toLowerCase();
+          const isUniversityEmail = emailLower.endsWith("@ugr.es") || emailLower.endsWith("@go.ugr.es");
+
+          if (isUniversityEmail) {
+            await db.user.update({
+              where: { id: user.id },
+              data: { role: "TEACHER" },
+            });
+            session.user.role = "TEACHER";
+          } else {
+            session.user.role = "STUDENT";
+          }
+        } else {
+          session.user.role = dbUser?.role ?? "STUDENT";
+        }
+
         session.user.hasAccessCode = !!dbUser?.accessCode;
       }
       return session;
