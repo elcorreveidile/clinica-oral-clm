@@ -4,6 +4,35 @@ import AppleProvider from "next-auth/providers/apple";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "@/lib/db";
 
+// Crear un proveedor de credenciales personalizado para email/contraseña
+import CredentialsProvider from "next-auth/providers/credentials";
+
+// Estrategia para hashear contraseñas sin NextAuth
+async function verifyPassword(email: string, password: string) {
+  const user = await db.user.findUnique({
+    where: { email: email.toLowerCase() },
+  });
+
+  if (!user || !user.password) {
+    return null;
+  }
+
+  // Importar bcrypt dinámicamente solo cuando se necesite
+  const bcrypt = (await import('bcryptjs')).default;
+  const isValid = await bcrypt.compare(password, user.password);
+
+  if (!isValid) {
+    return null;
+  }
+
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+  };
+}
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(db) as NextAuthOptions["adapter"],
   providers: [
@@ -18,6 +47,27 @@ export const authOptions: NextAuthOptions = {
         privateKey: process.env.APPLE_PRIVATE_KEY!,
         keyId: process.env.APPLE_KEY_ID!,
       } as unknown as string,
+    }),
+    CredentialsProvider({
+      id: "credentials",
+      name: "Credenciales",
+      type: "credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Contraseña", type: "password" },
+      },
+      async authorize(credentials) {
+        const user = await verifyPassword(
+          credentials.email as string,
+          credentials.password as string
+        );
+
+        if (!user) {
+          return null;
+        }
+
+        return user;
+      },
     }),
   ],
   callbacks: {

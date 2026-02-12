@@ -1,8 +1,7 @@
 "use client";
 
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { useState } from "react";
 import { signIn } from "next-auth/react";
+import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 export default function SignInPage() {
@@ -34,8 +33,8 @@ export default function SignInPage() {
     }
   };
 
-  // Email/Password handler
-  const handlePasswordLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+  // Email/Password handler usando NextAuth
+  const handlePasswordLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
@@ -45,22 +44,20 @@ export default function SignInPage() {
     const password = formData.get("password") as string;
 
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
+      if (result?.error) {
+        setError(result.error);
+      } else {
         router.push("/dashboard");
         router.refresh();
-      } else {
-        setError(data.error || "Error al iniciar sesión");
       }
     } catch (_err) {
-      setError("Error al conectar con el servidor");
+      setError("Error al iniciar sesión");
     } finally {
       setIsLoading(false);
     }
@@ -140,7 +137,7 @@ export default function SignInPage() {
             </div>
           </div>
         ) : (
-          // Email/Password form
+          // Email/Password form usando NextAuth Credentials
           <div className="space-y-4">
             <h2 className="text-xl font-semibold">Iniciar Sesión</h2>
             <p className="text-sm text-muted-foreground">
@@ -197,11 +194,11 @@ export default function SignInPage() {
             </div>
 
             <div className="mt-6 rounded-lg bg-muted p-4 text-sm">
-              <p className="font-medium">¿No tienes cuenta?</p>
-              <p className="mt-2 text-muted-foreground">
-                Estudiantes: Usa el código proporcionado por tu profesor
+              <p className="font-medium">Credenciales de prueba:</p>
+              <p className="mt-2 text-muted-foreground text-xs">
+                <strong>profe@clm.ugr.es</strong> / <strong>Prueba2024*</strong>
                 <br />
-                Profesores: Contacta al administrador
+                <strong>benitezl@go.ugr.es</strong> / <strong>Admin2024*</strong>
               </p>
             </div>
           </div>
