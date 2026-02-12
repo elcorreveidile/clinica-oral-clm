@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+import { authOptions } from '@/lib/auth'
 import { PrismaClient } from '@prisma/client'
 import { v2 as cloudinary } from 'cloudinary'
 
@@ -135,7 +135,7 @@ export async function POST(req: NextRequest) {
         .end(buffer)
     })
 
-    const uploadResult: any = await uploadPromise
+    const uploadResult = await uploadPromise as { secure_url?: string } | null
 
     if (!uploadResult?.secure_url) {
       return NextResponse.json(
