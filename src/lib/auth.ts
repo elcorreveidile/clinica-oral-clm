@@ -21,23 +21,30 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async signIn({ user }) {
-      if (!user.email) return false;
+    async signIn({ user, email }) {
+      if (!email) return false;
 
-      // Asignar rol automáticamente basado en el email
-      const email = user.email.toLowerCase();
-      const isUniversityEmail = email.endsWith("@ugr.es") || email.endsWith("@go.ugr.es");
+      // Si es email de la universidad y no tiene rol, asignar TEACHER
+      const emailLower = email.toLowerCase();
+      const isUniversityEmail = emailLower.endsWith("@ugr.es") || emailLower.endsWith("@go.ugr.es");
 
-      // Crear o actualizar el usuario con el rol correcto
-      await db.user.upsert({
-        where: { email },
-        update: { role: isUniversityEmail ? "TEACHER" : "STUDENT" },
-        create: {
-          email,
-          name: user.name,
-          role: isUniversityEmail ? "TEACHER" : "STUDENT",
-        },
+      const existingUser = await db.user.findUnique({
+        where: { email: emailLower },
       });
+
+      if (existingUser && existingUser.role === "STUDENT" && isUniversityEmail) {
+        // Actualizar a TEACHER si es email universitario
+        await db.user.update({
+          where: { email: emailLower },
+          data: { role: "TEACHER" },
+        });
+      } else if (!existingUser && isUniversityEmail) {
+        // Es primer registro de email universitario, actualizar rol a TEACHER
+        await db.user.update({
+          where: { email: emailLower },
+          data: { role: "TEACHER" },
+        });
+      }
 
       return true;
     },
