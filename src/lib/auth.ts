@@ -21,11 +21,11 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async signIn({ user, email }) {
-      if (!email) return false;
+    async signIn({ user, account }) {
+      if (!user.email) return false;
 
       // Si es email de la universidad y no tiene rol, asignar TEACHER
-      const emailLower = email.toLowerCase();
+      const emailLower = user.email.toLowerCase();
       const isUniversityEmail = emailLower.endsWith("@ugr.es") || emailLower.endsWith("@go.ugr.es");
 
       const existingUser = await db.user.findUnique({
