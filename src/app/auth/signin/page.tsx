@@ -35,7 +35,7 @@ export default function SignInPage() {
   };
 
   // Email/Password handler
-  const handlePasswordLogin = async (e: React.FormEvent) => {
+  const handlePasswordLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
