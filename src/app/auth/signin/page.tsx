@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -24,6 +25,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   AccessCodeExpired: "Este Código de Clínica ha expirado.",
   OAuthAccountNotLinked:
     "Ya existe una cuenta con ese correo. Inicia sesión con el proveedor original.",
+  CredentialsSignin: "Email o contraseña incorrectos.",
   Default: "Ocurrió un error al iniciar sesión. Inténtalo de nuevo.",
 };
 
@@ -38,22 +40,49 @@ export default function SignInPage() {
 function SignInContent() {
   const searchParams = useSearchParams();
   const errorParam = searchParams.get("error");
-  const [accessCode, setAccessCode] = useState("");
+  const registered = searchParams.get("registered");
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const errorMessage = errorParam
-    ? ERROR_MESSAGES[errorParam] || ERROR_MESSAGES.Default
-    : null;
+  // OAuth state
+  const [accessCode, setAccessCode] = useState("");
 
-  const handleSignIn = (provider: string) => {
-    if (!accessCode.trim()) return;
+  const errorMessage = error
+    ? error
+    : errorParam
+      ? ERROR_MESSAGES[errorParam] || ERROR_MESSAGES.Default
+      : null;
 
+  const handleCredentialsLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading("credentials");
+
+    const result = await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
+
+    if (result?.error) {
+      setError(ERROR_MESSAGES.CredentialsSignin);
+      setLoading(null);
+    } else {
+      window.location.href = "/dashboard";
+    }
+  };
+
+  const handleOAuthSignIn = (provider: string) => {
     setLoading(provider);
 
-    // Store access code in cookie before OAuth redirect
-    document.cookie = `clinic-access-code=${encodeURIComponent(
-      accessCode.trim()
-    )}; path=/; max-age=600; SameSite=Lax`;
+    if (accessCode.trim()) {
+      document.cookie = `clinic-access-code=${encodeURIComponent(
+        accessCode.trim()
+      )}; path=/; max-age=600; SameSite=Lax`;
+    }
 
     signIn(provider, { callbackUrl: "/dashboard" });
   };
@@ -74,13 +103,20 @@ function SignInContent() {
         {/* Sign-in Card */}
         <Card>
           <CardHeader className="space-y-1">
-            <CardTitle className="text-xl text-center">Acceder</CardTitle>
+            <CardTitle className="text-xl text-center">Iniciar sesión</CardTitle>
             <CardDescription className="text-center">
-              Introduce tu código de clínica y elige cómo iniciar sesión
+              Accede con tu correo electrónico y contraseña
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
+            {/* Success message after registration */}
+            {registered && (
+              <div className="rounded-md border border-green-500/50 bg-green-500/10 px-4 py-3 text-sm text-green-700">
+                Cuenta creada correctamente. Inicia sesión con tus credenciales.
+              </div>
+            )}
+
             {/* Error message */}
             {errorMessage && (
               <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -88,22 +124,42 @@ function SignInContent() {
               </div>
             )}
 
-            {/* Access code field */}
-            <div className="space-y-2">
-              <Label htmlFor="accessCode">Código de Clínica</Label>
-              <Input
-                id="accessCode"
-                type="text"
-                placeholder="Ej: CLM-2025-XXXX"
-                value={accessCode}
-                onChange={(e) => setAccessCode(e.target.value)}
-                autoComplete="off"
-              />
-              <p className="text-xs text-muted-foreground">
-                Código proporcionado por tu profesor. Obligatorio para nuevos
-                registros.
-              </p>
-            </div>
+            {/* Email/Password form */}
+            <form onSubmit={handleCredentialsLogin} className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="email">Correo electrónico</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="tu@correo.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Contraseña</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Tu contraseña"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <Button
+                type="submit"
+                className="w-full h-11"
+                disabled={loading !== null}
+              >
+                {loading === "credentials" ? (
+                  <LoadingSpinner />
+                ) : (
+                  "Iniciar sesión"
+                )}
+              </Button>
+            </form>
 
             {/* Divider */}
             <div className="relative">
@@ -112,9 +168,27 @@ function SignInContent() {
               </div>
               <div className="relative flex justify-center text-xs uppercase">
                 <span className="bg-card px-2 text-muted-foreground">
-                  Continuar con
+                  O continuar con
                 </span>
               </div>
+            </div>
+
+            {/* OAuth: Access code for new users */}
+            <div className="space-y-2">
+              <Label htmlFor="accessCode">
+                Código de Clínica{" "}
+                <span className="text-muted-foreground font-normal">
+                  (solo nuevos registros OAuth)
+                </span>
+              </Label>
+              <Input
+                id="accessCode"
+                type="text"
+                placeholder="Ej: CLM-2025-XXXX"
+                value={accessCode}
+                onChange={(e) => setAccessCode(e.target.value)}
+                autoComplete="off"
+              />
             </div>
 
             {/* OAuth buttons */}
@@ -122,36 +196,37 @@ function SignInContent() {
               <Button
                 variant="outline"
                 className="w-full h-11 gap-3"
-                onClick={() => handleSignIn("google")}
-                disabled={!accessCode.trim() || loading !== null}
+                onClick={() => handleOAuthSignIn("google")}
+                disabled={loading !== null}
               >
-                {loading === "google" ? (
-                  <LoadingSpinner />
-                ) : (
-                  <GoogleIcon />
-                )}
+                {loading === "google" ? <LoadingSpinner /> : <GoogleIcon />}
                 Continuar con Google
               </Button>
 
               <Button
                 variant="outline"
                 className="w-full h-11 gap-3"
-                onClick={() => handleSignIn("apple")}
-                disabled={!accessCode.trim() || loading !== null}
+                onClick={() => handleOAuthSignIn("apple")}
+                disabled={loading !== null}
               >
-                {loading === "apple" ? (
-                  <LoadingSpinner />
-                ) : (
-                  <AppleIcon />
-                )}
+                {loading === "apple" ? <LoadingSpinner /> : <AppleIcon />}
                 Continuar con Apple
               </Button>
             </div>
           </CardContent>
 
-          <CardFooter>
+          <CardFooter className="flex flex-col gap-2">
+            <p className="w-full text-center text-sm">
+              ¿No tienes cuenta?{" "}
+              <Link
+                href="/auth/register"
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                Regístrate aquí
+              </Link>
+            </p>
             <p className="w-full text-center text-xs text-muted-foreground">
-              Si ya tienes cuenta, el código no se volverá a validar.
+              Si ya tienes cuenta OAuth, el código no se volverá a validar.
             </p>
           </CardFooter>
         </Card>

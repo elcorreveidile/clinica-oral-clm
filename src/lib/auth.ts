@@ -1,8 +1,10 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import AppleProvider from "next-auth/providers/apple";
+import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { cookies } from "next/headers";
+import { compare } from "bcryptjs";
 import { db } from "@/lib/db";
 import { Role } from "@prisma/client";
 
@@ -10,22 +12,71 @@ export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(db) as NextAuthOptions["adapter"],
   session: { strategy: "jwt" },
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    // ── Email / Password ──
+    CredentialsProvider({
+      name: "credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Contraseña", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          throw new Error("Email y contraseña son obligatorios");
+        }
+
+        const user = await db.user.findUnique({
+          where: { email: credentials.email },
+        });
+
+        if (!user || !user.password) {
+          throw new Error("Credenciales incorrectas");
+        }
+
+        const isValid = await compare(credentials.password, user.password);
+        if (!isValid) {
+          throw new Error("Credenciales incorrectas");
+        }
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+        };
+      },
     }),
-    AppleProvider({
-      clientId: process.env.APPLE_ID!,
-      clientSecret: {
-        teamId: process.env.APPLE_TEAM_ID!,
-        privateKey: process.env.APPLE_PRIVATE_KEY!,
-        keyId: process.env.APPLE_KEY_ID!,
-      } as unknown as string,
-    }),
+
+    // ── OAuth (optional – only enabled when env vars are set) ──
+    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+      ? [
+          GoogleProvider({
+            clientId: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+          }),
+        ]
+      : []),
+
+    ...(process.env.APPLE_ID && process.env.APPLE_PRIVATE_KEY
+      ? [
+          AppleProvider({
+            clientId: process.env.APPLE_ID!,
+            clientSecret: {
+              teamId: process.env.APPLE_TEAM_ID!,
+              privateKey: process.env.APPLE_PRIVATE_KEY!,
+              keyId: process.env.APPLE_KEY_ID!,
+            } as unknown as string,
+          }),
+        ]
+      : []),
   ],
   callbacks: {
-    async signIn({ user }) {
-      // ── Returning user: allow sign-in without access code ──
+    async signIn({ user, account }) {
+      // Credentials login already validated in authorize()
+      if (account?.provider === "credentials") {
+        return true;
+      }
+
+      // ── OAuth: Returning user ──
       const existingUser = await db.user.findUnique({
         where: { email: user.email! },
       });
@@ -34,7 +85,7 @@ export const authOptions: NextAuthOptions = {
         return true;
       }
 
-      // ── New user: validate access code ──
+      // ── OAuth: New user – validate access code ──
       const cookieStore = cookies();
       const accessCode = cookieStore.get("clinic-access-code")?.value;
 
@@ -58,7 +109,6 @@ export const authOptions: NextAuthOptions = {
         return "/auth/signin?error=AccessCodeExpired";
       }
 
-      // ── Valid code: mark as used and allow registration ──
       await db.accessCode.update({
         where: { id: codeRecord.id },
         data: {
@@ -72,14 +122,21 @@ export const authOptions: NextAuthOptions = {
 
     async jwt({ token, user }) {
       if (user) {
-        const dbUser = await db.user.findUnique({
-          where: { email: user.email! },
-          select: { id: true, role: true, accessCode: true },
-        });
-        if (dbUser) {
-          token.id = dbUser.id;
-          token.role = dbUser.role;
-          token.hasAccessCode = !!dbUser.accessCode;
+        // For credentials, user object already has role from authorize()
+        if ("role" in user) {
+          token.id = user.id;
+          token.role = user.role;
+          token.hasAccessCode = false;
+        } else {
+          const dbUser = await db.user.findUnique({
+            where: { email: user.email! },
+            select: { id: true, role: true, accessCode: true },
+          });
+          if (dbUser) {
+            token.id = dbUser.id;
+            token.role = dbUser.role;
+            token.hasAccessCode = !!dbUser.accessCode;
+          }
         }
       }
       return token;

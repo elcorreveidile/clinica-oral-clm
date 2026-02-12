@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { cloudinary } from "@/lib/cloudinary";
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -50,10 +51,44 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // TODO: Upload file to Cloudinary and get the URL
-  // For now, store a placeholder URL
+  // Upload file to Cloudinary
   const mediaType = file.type.startsWith("video") ? "video" : "audio";
-  const mediaUrl = `/uploads/placeholder-${Date.now()}`;
+  const bytes = await file.arrayBuffer();
+  const buffer = Buffer.from(bytes);
+
+  let mediaUrl: string;
+  try {
+    const result = await new Promise<{ secure_url: string }>(
+      (resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            resource_type: "video", // Cloudinary uses "video" for both audio and video
+            folder: `clinica-clm/submissions/${session.user.id}`,
+            allowed_formats: [
+              "mp3",
+              "mp4",
+              "wav",
+              "webm",
+              "ogg",
+              "m4a",
+              "mov",
+            ],
+          },
+          (error, result) => {
+            if (error || !result) reject(error ?? new Error("Upload failed"));
+            else resolve(result);
+          }
+        );
+        stream.end(buffer);
+      }
+    );
+    mediaUrl = result.secure_url;
+  } catch {
+    return NextResponse.json(
+      { error: "Error al subir el archivo. Inténtalo de nuevo." },
+      { status: 500 }
+    );
+  }
 
   const submission = await db.submission.create({
     data: {

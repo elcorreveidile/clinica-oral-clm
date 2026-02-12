@@ -78,6 +78,7 @@ model User {
   email         String?   @unique
   emailVerified DateTime?
   image         String?
+  password      String?
   role          Role      @default(STUDENT)
 
   // Código de acceso proporcionado por el profesor para completar registro
