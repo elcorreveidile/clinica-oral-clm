@@ -1,14 +1,28 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { verifyAuth } from "@/lib/auth";
+import { db } from "@/lib/db";
 import Link from "next/link";
 
 export default async function EstudiantePage() {
-  const session = await getServerSession(authOptions);
+  const cookieStore = await cookies();
+  const token = cookieStore.get('auth-token')?.value;
 
-  if (!session?.user) {
+  if (!token) {
     redirect("/auth/signin");
   }
+
+  const user = await verifyAuth(token);
+
+  if (!user) {
+    redirect("/auth/signin");
+  }
+
+  // Obtener información adicional del usuario (accessCode)
+  const dbUser = await db.user.findUnique({
+    where: { id: user.id },
+    select: { accessCode: true },
+  });
 
   return (
     <main className="min-h-screen p-8">
@@ -17,20 +31,22 @@ export default async function EstudiantePage() {
           <div>
             <h1 className="text-3xl font-bold">Panel del Estudiante</h1>
             <p className="text-muted-foreground">
-              Bienvenido, {session.user.name}
+              Bienvenido, {user.name}
             </p>
           </div>
           <div className="flex gap-2">
-            <Link
-              href="/api/auth/signout"
-              className="rounded-md border px-4 py-2 text-sm hover:bg-accent"
-            >
-              Cerrar Sesión
-            </Link>
+            <form action="/api/auth/logout" method="POST">
+              <button
+                type="submit"
+                className="rounded-md border px-4 py-2 text-sm hover:bg-accent"
+              >
+                Cerrar Sesión
+              </button>
+            </form>
           </div>
         </div>
 
-        {!session.user.hasAccessCode && (
+        {!dbUser?.accessCode && (
           <div className="mb-8 rounded-lg border border-yellow-200 bg-yellow-50 p-6">
             <h2 className="text-lg font-semibold text-yellow-900">
               Código de acceso requerido

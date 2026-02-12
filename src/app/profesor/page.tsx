@@ -1,12 +1,19 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { verifyAuth } from "@/lib/auth";
 import Link from "next/link";
 
 export default async function ProfesorPage() {
-  const session = await getServerSession(authOptions);
+  const cookieStore = await cookies();
+  const token = cookieStore.get('auth-token')?.value;
 
-  if (!session?.user || session.user.role !== "TEACHER") {
+  if (!token) {
+    redirect("/auth/signin");
+  }
+
+  const user = await verifyAuth(token);
+
+  if (!user || user.role !== "TEACHER") {
     redirect("/auth/signin");
   }
 
@@ -17,16 +24,18 @@ export default async function ProfesorPage() {
           <div>
             <h1 className="text-3xl font-bold">Panel del Profesor</h1>
             <p className="text-muted-foreground">
-              Bienvenido, {session.user.name}
+              Bienvenido, {user.name}
             </p>
           </div>
           <div className="flex gap-2">
-            <Link
-              href="/api/auth/signout"
-              className="rounded-md border px-4 py-2 text-sm hover:bg-accent"
-            >
-              Cerrar Sesión
-            </Link>
+            <form action="/api/auth/logout" method="POST">
+              <button
+                type="submit"
+                className="rounded-md border px-4 py-2 text-sm hover:bg-accent"
+              >
+                Cerrar Sesión
+              </button>
+            </form>
           </div>
         </div>
 

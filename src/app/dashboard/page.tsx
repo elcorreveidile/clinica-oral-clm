@@ -1,22 +1,24 @@
 import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { cookies } from "next/headers";
+import { verifyAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 export default async function DashboardPage() {
-  const session = await getServerSession(authOptions);
+  const cookieStore = await cookies();
+  const token = cookieStore.get('auth-token')?.value;
 
-  if (!session?.user) {
+  if (!token) {
     redirect("/auth/signin");
   }
 
-  const user = await db.user.findUnique({
-    where: { id: session.user.id },
-    select: { role: true },
-  });
+  const user = await verifyAuth(token);
+
+  if (!user) {
+    redirect("/auth/signin");
+  }
 
   // Redirigir según el rol
-  if (user?.role === "TEACHER") {
+  if (user.role === "TEACHER") {
     redirect("/profesor");
   } else {
     redirect("/estudiante");
