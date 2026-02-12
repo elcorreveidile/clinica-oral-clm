@@ -4,13 +4,48 @@
 // =============================================================
 
 import { PrismaClient } from '@prisma/client'
+import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
 async function main() {
   console.log('🌱 Starting database seed...')
 
-  // Crear códigos de acceso para estudiantes
+  // Hash contraseñas para usuarios de prueba
+  const teacherPassword = await bcrypt.hash('Prueba2024*', 10)
+  const adminPassword = await bcrypt.hash('Admin2024*', 10)
+
+  // 1. Crear usuario PROFESOR
+  console.log('📚 Creating TEACHER user...')
+  const teacher = await prisma.user.upsert({
+    where: { email: 'profe@clm.ugr.es' },
+    update: {},
+    create: {
+      email: 'profe@clm.ugr.es',
+      name: 'Profe Prueba',
+      password: teacherPassword,
+      role: 'TEACHER',
+    },
+  })
+  console.log(`   ✅ TEACHER created: ${teacher.email}`)
+  console.log(`   🔑 Password: Prueba2024*`)
+
+  // 2. Crear usuario ADMIN
+  console.log('🔐 Creating ADMIN user...')
+  const admin = await prisma.user.upsert({
+    where: { email: 'benitezl@go.ugr.es' },
+    update: {},
+    create: {
+      email: 'benitezl@go.ugr.es',
+      name: 'Javier Benítez',
+      password: adminPassword,
+      role: 'TEACHER',
+    },
+  })
+  console.log(`   ✅ ADMIN created: ${admin.email}`)
+  console.log(`   🔑 Password: Admin2024*`)
+
+  // 3. Crear códigos de acceso para estudiantes
   console.log('🔑 Creating AccessCodes for students...')
   const codes = [
     { code: 'CLINICA2024', isUsed: false },
@@ -30,15 +65,14 @@ async function main() {
   console.log('✨ Database seed completed successfully!')
   console.log('')
   console.log('────────────────────────────────────────────────────────────')
-  console.log('📋 ACCESS CODES CREATED:')
+  console.log('📋 CREDENTIALS CREATED:')
   console.log('────────────────────────────────────────────────────────────')
-  console.log(`  🔑 CLINICA2024`)
-  console.log(`  🔑 ESPAÑOL2024`)
-  console.log(`  🔑 GRANADA2024`)
-  console.log('────────────────────────────────────────────────────────────')
-  console.log('')
-  console.log('👨‍🏫 TEACHERS: Use your @ugr.es or @go.ugr.es email')
-  console.log('👨‍🎓 STUDENTS: Register with any email, then use a code')
+  console.log(`  👨‍🏫 TEACHER:   profe@clm.ugr.es`)
+  console.log(`  🔑 Password:  Prueba2024*`)
+  console.log(`  🔐 ADMIN:      benitezl@go.ugr.es`)
+  console.log(`  🔑 Password:  Admin2024*`)
+  console.log(``)
+  console.log(`  🔑 CODE:       CLINICA2024`)
   console.log('────────────────────────────────────────────────────────────')
 }
 

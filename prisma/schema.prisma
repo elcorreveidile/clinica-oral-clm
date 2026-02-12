@@ -80,6 +80,9 @@ model User {
   image         String?
   role          Role      @default(STUDENT)
 
+  // Contraseña hasheada para login tradicional (opcional para OAuth)
+  password      String?
+
   // Código de acceso proporcionado por el profesor para completar registro
   accessCode    String?
 
