@@ -1,7 +1,7 @@
-import { getServerSession } from "next-auth";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { authOptions } from "@/lib/auth";
+import { verifyAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
   Card,
@@ -28,15 +28,19 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 export default async function EstudiantePage() {
-  const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "STUDENT") redirect("/dashboard");
+  const cookieStore = await cookies();
+  const token = cookieStore.get('auth-token')?.value;
+  if (!token) redirect("/auth/signin");
+  const user = await verifyAuth(token);
+  if (!user) redirect("/auth/signin");
+  if (user.role !== "STUDENT") redirect("/dashboard");
 
   const activities = await db.activity.findMany({
     where: { isPublished: true },
     orderBy: { createdAt: "desc" },
     include: {
       submissions: {
-        where: { studentId: session.user.id },
+        where: { studentId: user.id },
         select: { id: true, status: true },
       },
     },
@@ -49,7 +53,7 @@ export default async function EstudiantePage() {
           Consultorio del Estudiante
         </h1>
         <p className="text-muted-foreground">
-          Bienvenido/a, {session.user.name?.split(" ")[0]}. Aquí encontrarás tus
+          Bienvenido/a, {user.name?.split(" ")[0]}. Aquí encontrarás tus
           actividades de inmersión cultural.
         </p>
       </div>

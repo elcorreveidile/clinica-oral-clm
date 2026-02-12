@@ -1,6 +1,6 @@
-import { getServerSession } from "next-auth";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
+import { verifyAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
   Card,
@@ -13,8 +13,12 @@ import { Badge } from "@/components/ui/badge";
 import { GenerateCodeForm } from "./generate-code-form";
 
 export default async function CodigosPage() {
-  const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "TEACHER") redirect("/dashboard");
+  const cookieStore = await cookies();
+  const token = cookieStore.get('auth-token')?.value;
+  if (!token) redirect("/auth/signin");
+  const user = await verifyAuth(token);
+  if (!user) redirect("/auth/signin");
+  if (user.role !== "TEACHER") redirect("/dashboard");
 
   const codes = await db.accessCode.findMany({
     orderBy: { createdAt: "desc" },

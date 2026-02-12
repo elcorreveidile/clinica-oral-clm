@@ -1,7 +1,7 @@
-import { getServerSession } from "next-auth";
+import { cookies } from "next/headers";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { authOptions } from "@/lib/auth";
+import { verifyAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
   Card,
@@ -31,14 +31,18 @@ export default async function ActivityDetailPage({
 }: {
   params: { id: string };
 }) {
-  const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "STUDENT") redirect("/dashboard");
+  const cookieStore = await cookies();
+  const token = cookieStore.get('auth-token')?.value;
+  if (!token) redirect("/auth/signin");
+  const user = await verifyAuth(token);
+  if (!user) redirect("/auth/signin");
+  if (user.role !== "STUDENT") redirect("/dashboard");
 
   const activity = await db.activity.findUnique({
     where: { id: params.id, isPublished: true },
     include: {
       submissions: {
-        where: { studentId: session.user.id },
+        where: { studentId: user.id },
         include: {
           feedback: {
             include: { teacher: { select: { name: true } } },

@@ -1,7 +1,7 @@
-import { getServerSession } from "next-auth";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { authOptions } from "@/lib/auth";
+import { verifyAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
   Card,
@@ -13,12 +13,16 @@ import {
 import { Button } from "@/components/ui/button";
 
 export default async function ProfesorPage() {
-  const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "TEACHER") redirect("/dashboard");
+  const cookieStore = await cookies();
+  const token = cookieStore.get('auth-token')?.value;
+  if (!token) redirect("/auth/signin");
+  const user = await verifyAuth(token);
+  if (!user) redirect("/auth/signin");
+  if (user.role !== "TEACHER") redirect("/dashboard");
 
   const [activityCount, pendingSubmissions, totalStudents, recentSubmissions] =
     await Promise.all([
-      db.activity.count({ where: { createdBy: session.user.id } }),
+      db.activity.count({ where: { createdBy: user.id } }),
       db.submission.count({ where: { status: "PENDING" } }),
       db.user.count({ where: { role: "STUDENT" } }),
       db.submission.findMany({
@@ -37,7 +41,7 @@ export default async function ProfesorPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Panel del Profesor</h1>
         <p className="text-muted-foreground">
-          Bienvenido/a, {session.user.name?.split(" ")[0]}. Vista general de tu
+          Bienvenido/a, {user.name?.split(" ")[0]}. Vista general de tu
           clínica.
         </p>
       </div>

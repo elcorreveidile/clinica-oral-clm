@@ -1,45 +1,86 @@
-import { PrismaClient } from "@prisma/client";
-import { hash } from "bcryptjs";
+// =============================================================
+// Clínica Cultural y Lingüística de Español - Database Seed
+// CLM - Universidad de Granada
+// =============================================================
 
-const prisma = new PrismaClient();
+import { PrismaClient } from '@prisma/client'
+import bcrypt from 'bcryptjs'
+
+const prisma = new PrismaClient()
 
 async function main() {
-  console.log("Seeding database...");
+  console.log('🌱 Starting database seed...')
 
-  // ── 1. Profesor ──
-  const hashedPassword = await hash("profesor123", 12);
+  // Hash contraseñas para usuarios de prueba
+  const teacherPassword = await bcrypt.hash('Prueba2024*', 10)
+  const adminPassword = await bcrypt.hash('Admin2024*', 10)
 
+  // 1. Crear usuario PROFESOR
+  console.log('📚 Creating TEACHER user...')
   const teacher = await prisma.user.upsert({
-    where: { email: "profe@clm.ugr.es" },
+    where: { email: 'profe@clm.ugr.es' },
     update: {},
     create: {
-      email: "profe@clm.ugr.es",
-      name: "Javier Benítez",
-      password: hashedPassword,
-      role: "TEACHER",
-      emailVerified: new Date(),
+      email: 'profe@clm.ugr.es',
+      name: 'Profe Prueba',
+      password: teacherPassword,
+      role: 'TEACHER',
     },
-  });
-  console.log(`  Teacher created: ${teacher.name} (${teacher.email})`);
-  console.log(`  Teacher password: profesor123`);
+  })
+  console.log(`   ✅ TEACHER created: ${teacher.email}`)
+  console.log(`   🔑 Password: Prueba2024*`)
 
-  // ── 2. Código de acceso para registrar un estudiante ──
-  const accessCode = await prisma.accessCode.upsert({
-    where: { code: "CLINICA2024" },
+  // 2. Crear usuario ADMIN
+  console.log('🔐 Creating ADMIN user...')
+  const admin = await prisma.user.upsert({
+    where: { email: 'benitezl@go.ugr.es' },
     update: {},
     create: {
-      code: "CLINICA2024",
-      isUsed: false,
+      email: 'benitezl@go.ugr.es',
+      name: 'Javier Benítez',
+      password: adminPassword,
+      role: 'TEACHER',
     },
-  });
-  console.log(`  Access code created: ${accessCode.code}`);
+  })
+  console.log(`   ✅ ADMIN created: ${admin.email}`)
+  console.log(`   🔑 Password: Admin2024*`)
 
-  console.log("\nSeed complete.");
+  // 3. Crear códigos de acceso para estudiantes
+  console.log('🔑 Creating AccessCodes for students...')
+  const codes = [
+    { code: 'CLINICA2024', isUsed: false },
+    { code: 'ESPAÑOL2024', isUsed: false },
+    { code: 'GRANADA2024', isUsed: false },
+  ]
+
+  for (const codeData of codes) {
+    const accessCode = await prisma.accessCode.upsert({
+      where: { code: codeData.code },
+      update: {},
+      create: codeData,
+    })
+    console.log(`   ✅ AccessCode created: ${accessCode.code}`)
+  }
+
+  console.log('✨ Database seed completed successfully!')
+  console.log('')
+  console.log('────────────────────────────────────────────────────────────')
+  console.log('📋 CREDENTIALS CREATED:')
+  console.log('────────────────────────────────────────────────────────────')
+  console.log(`  👨‍🏫 TEACHER:   profe@clm.ugr.es`)
+  console.log(`  🔑 Password:  Prueba2024*`)
+  console.log(`  🔐 ADMIN:      benitezl@go.ugr.es`)
+  console.log(`  🔑 Password:  Admin2024*`)
+  console.log(``)
+  console.log(`  🔑 CODE:       CLINICA2024`)
+  console.log('────────────────────────────────────────────────────────────')
 }
 
 main()
   .catch((e) => {
-    console.error(e);
-    process.exit(1);
+    console.error('❌ Seed failed:', e)
+    process.exit(1)
   })
-  .finally(() => prisma.$disconnect());
+  .finally(async () => {
+    await prisma.$disconnect()
+  })

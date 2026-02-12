@@ -1,6 +1,6 @@
-import { getServerSession } from "next-auth";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
+import { verifyAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
   Card,
@@ -27,8 +27,12 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export default async function EntregasPage() {
-  const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "TEACHER") redirect("/dashboard");
+  const cookieStore = await cookies();
+  const token = cookieStore.get('auth-token')?.value;
+  if (!token) redirect("/auth/signin");
+  const user = await verifyAuth(token);
+  if (!user) redirect("/auth/signin");
+  if (user.role !== "TEACHER") redirect("/dashboard");
 
   const submissions = await db.submission.findMany({
     orderBy: { createdAt: "desc" },

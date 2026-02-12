@@ -1,17 +1,25 @@
 import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { cookies } from "next/headers";
+import { verifyAuth } from "@/lib/auth";
 
 export default async function DashboardPage() {
-  const session = await getServerSession(authOptions);
+  const cookieStore = await cookies();
+  const token = cookieStore.get('auth-token')?.value;
 
-  if (!session) {
+  if (!token) {
     redirect("/auth/signin");
   }
 
-  if (session.user.role === "TEACHER") {
-    redirect("/profesor");
+  const user = await verifyAuth(token);
+
+  if (!user) {
+    redirect("/auth/signin");
   }
 
-  redirect("/estudiante");
+  // Redirigir según el rol
+  if (user.role === "TEACHER") {
+    redirect("/profesor");
+  } else {
+    redirect("/estudiante");
+  }
 }

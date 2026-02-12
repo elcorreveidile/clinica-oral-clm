@@ -1,30 +1,41 @@
-import { withAuth } from "next-auth/middleware";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from 'next/server';
+import { getUserFromRequest } from '@/lib/auth';
 
-export default withAuth(
-  function middleware(req) {
-    const { pathname } = req.nextUrl;
-    const role = req.nextauth.token?.role as string | undefined;
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
 
-    // Students cannot access teacher routes
-    if (pathname.startsWith("/profesor") && role !== "TEACHER") {
-      return NextResponse.redirect(new URL("/estudiante", req.url));
-    }
+  // Rutas públicas - no requieren autenticación
+  const isPublicPath =
+    pathname === '/' ||
+    pathname === '/auth/signin' ||
+    pathname.startsWith('/api/auth/') ||
+    pathname.startsWith('/api/submissions');
 
-    // Teachers cannot access student routes
-    if (pathname.startsWith("/estudiante") && role !== "STUDENT") {
-      return NextResponse.redirect(new URL("/profesor", req.url));
-    }
-
+  if (isPublicPath) {
     return NextResponse.next();
-  },
-  {
-    callbacks: {
-      authorized: ({ token }) => !!token,
-    },
   }
-);
+
+  // Verificar autenticación via JWT cookie
+  const user = await getUserFromRequest(request);
+
+  if (!user) {
+    const url = new URL('/auth/signin', request.url);
+    return NextResponse.redirect(url);
+  }
+
+  // Protección por roles
+  if (pathname.startsWith('/profesor') && user.role !== 'TEACHER') {
+    return NextResponse.redirect(new URL('/estudiante', request.url));
+  }
+  if (pathname.startsWith('/estudiante') && user.role !== 'STUDENT') {
+    return NextResponse.redirect(new URL('/profesor', request.url));
+  }
+
+  return NextResponse.next();
+}
 
 export const config = {
-  matcher: ["/dashboard", "/estudiante/:path*", "/profesor/:path*"],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico).*)',
+  ],
 };

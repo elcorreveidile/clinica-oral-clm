@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { signOut, useSession } from "next-auth/react";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+
+interface NavbarUser {
+  name: string | null;
+  role: string;
+}
 
 const studentLinks = [
   { href: "/estudiante", label: "Actividades" },
@@ -21,21 +22,27 @@ const teacherLinks = [
   { href: "/profesor/codigos", label: "Códigos" },
 ];
 
-export function Navbar() {
-  const { data: session } = useSession();
+export function Navbar({ user }: { user?: NavbarUser | null }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  if (!session?.user) return null;
+  if (!user) return null;
 
-  const isTeacher = session.user.role === "TEACHER";
+  const isTeacher = user.role === "TEACHER";
   const links = isTeacher ? teacherLinks : studentLinks;
-  const initials = session.user.name
+  const initials = user.name
     ?.split(" ")
     .map((n) => n[0])
     .join("")
     .slice(0, 2)
     .toUpperCase();
+
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/auth/signin");
+    router.refresh();
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -74,26 +81,21 @@ export function Navbar() {
         <div className="flex items-center gap-3">
           <div className="hidden sm:block text-right">
             <p className="text-sm font-medium leading-none">
-              {session.user.name}
+              {user.name}
             </p>
             <p className="text-xs text-muted-foreground">
               {isTeacher ? "Profesor" : "Estudiante"}
             </p>
           </div>
-          <Avatar className="h-8 w-8">
-            {session.user.image && (
-              <AvatarImage src={session.user.image} alt={session.user.name ?? ""} />
-            )}
-            <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-          </Avatar>
-          <Button
-            variant="outline"
-            size="sm"
-            className="hidden sm:inline-flex"
-            onClick={() => signOut({ callbackUrl: "/auth/signin" })}
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-xs font-medium">
+            {initials}
+          </div>
+          <button
+            className="hidden sm:inline-flex rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+            onClick={handleLogout}
           >
             Salir
-          </Button>
+          </button>
 
           {/* Mobile menu button */}
           <button
@@ -146,10 +148,10 @@ export function Navbar() {
                 {link.label}
               </Link>
             ))}
-            <Separator className="my-2" />
+            <hr className="my-2" />
             <button
               className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground text-left rounded-md hover:bg-secondary/50 transition-colors"
-              onClick={() => signOut({ callbackUrl: "/auth/signin" })}
+              onClick={handleLogout}
             >
               Cerrar sesión
             </button>

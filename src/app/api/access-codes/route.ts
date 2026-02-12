@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getUserFromRequest } from "@/lib/auth";
 import { db } from "@/lib/db";
 import crypto from "crypto";
 
@@ -10,8 +9,8 @@ function generateCode(): string {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "TEACHER") {
+  const user = await getUserFromRequest(req);
+  if (!user || user.role !== "TEACHER") {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 

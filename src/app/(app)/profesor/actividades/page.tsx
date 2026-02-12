@@ -1,7 +1,7 @@
-import { getServerSession } from "next-auth";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { authOptions } from "@/lib/auth";
+import { verifyAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,11 +15,15 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export default async function ActividadesPage() {
-  const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "TEACHER") redirect("/dashboard");
+  const cookieStore = await cookies();
+  const token = cookieStore.get('auth-token')?.value;
+  if (!token) redirect("/auth/signin");
+  const user = await verifyAuth(token);
+  if (!user) redirect("/auth/signin");
+  if (user.role !== "TEACHER") redirect("/dashboard");
 
   const activities = await db.activity.findMany({
-    where: { createdBy: session.user.id },
+    where: { createdBy: user.id },
     orderBy: { createdAt: "desc" },
     include: {
       _count: { select: { submissions: true } },
