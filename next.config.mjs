@@ -1,7 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Configuración para Railway y otros hosts de Node.js
-  output: 'standalone',
   // Optimizaciones para producción
   reactStrictMode: true,
   // Configuración de imágenes si usas Next.js Image
