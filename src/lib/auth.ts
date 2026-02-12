@@ -74,30 +74,45 @@ export const authOptions: NextAuthOptions = {
     async session({ session, user }) {
       if (session.user) {
         session.user.id = user.id;
-        const dbUser = await db.user.findUnique({
-          where: { id: user.id },
-          select: { role: true, accessCode: true, email: true },
-        });
 
-        // Si es email universitario y es STUDENT, promover a TEACHER
-        if (dbUser?.email && dbUser.role === "STUDENT") {
-          const emailLower = dbUser.email.toLowerCase();
-          const isUniversityEmail = emailLower.endsWith("@ugr.es") || emailLower.endsWith("@go.ugr.es");
+        try {
+          const dbUser = await db.user.findUnique({
+            where: { id: user.id },
+            select: { role: true, accessCode: true, email: true },
+          });
 
-          if (isUniversityEmail) {
-            await db.user.update({
-              where: { id: user.id },
-              data: { role: "TEACHER" },
-            });
-            session.user.role = "TEACHER";
-          } else {
-            session.user.role = "STUDENT";
+          if (!dbUser) {
+            // If user not found in DB, use values from authorize function
+            session.user.role = (user as any).role || "STUDENT";
+            session.user.hasAccessCode = false;
+            return session;
           }
-        } else {
-          session.user.role = dbUser?.role ?? "STUDENT";
-        }
 
-        session.user.hasAccessCode = !!dbUser?.accessCode;
+          // Si es email universitario y es STUDENT, promover a TEACHER
+          if (dbUser.email && dbUser.role === "STUDENT") {
+            const emailLower = dbUser.email.toLowerCase();
+            const isUniversityEmail = emailLower.endsWith("@ugr.es") || emailLower.endsWith("@go.ugr.es");
+
+            if (isUniversityEmail) {
+              await db.user.update({
+                where: { id: user.id },
+                data: { role: "TEACHER" },
+              });
+              session.user.role = "TEACHER";
+            } else {
+              session.user.role = "STUDENT";
+            }
+          } else {
+            session.user.role = dbUser.role || "STUDENT";
+          }
+
+          session.user.hasAccessCode = !!dbUser.accessCode;
+        } catch (error) {
+          console.error("Error in session callback:", error);
+          // Fallback to user object from authorize
+          session.user.role = (user as any).role || "STUDENT";
+          session.user.hasAccessCode = false;
+        }
       }
       return session;
     },
