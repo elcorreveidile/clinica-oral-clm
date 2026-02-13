@@ -4,10 +4,11 @@
 // =============================================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getUserFromRequest } from '@/lib/auth'
 import { PrismaClient } from '@prisma/client'
 import { v2 as cloudinary } from 'cloudinary'
+
+export const dynamic = 'force-dynamic'
 
 const prisma = new PrismaClient()
 
@@ -19,26 +20,27 @@ cloudinary.config({
 })
 
 // GET /api/submissions - Obtener todas las entregas del usuario actual
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const user = await getUserFromRequest(req)
 
-    if (!session?.user?.email) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+    // Get full user data from database
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.id },
     })
 
-    if (!user) {
+    if (!dbUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     // Si es profesor, ver todas las entregas
     // Si es estudiante, solo ver las propias
     const submissions = await prisma.submission.findMany({
-      where: user.role === 'TEACHER' ? {} : { studentId: user.id },
+      where: dbUser.role === 'TEACHER' ? {} : { studentId: dbUser.id },
       include: {
         student: {
           select: { id: true, name: true, email: true },
@@ -70,17 +72,18 @@ export async function GET() {
 // POST /api/submissions - Crear una nueva entrega con subida a Cloudinary
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const user = await getUserFromRequest(req)
 
-    if (!session?.user?.email) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+    // Get full user data from database
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.id },
     })
 
-    if (!user) {
+    if (!dbUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
@@ -125,7 +128,7 @@ export async function POST(req: NextRequest) {
           {
             resource_type: resourceType,
             folder: 'clinica-clm/submissions',
-            public_id: `${user.id}_${activityId}_${Date.now()}`,
+            public_id: `${dbUser.id}_${activityId}_${Date.now()}`,
           },
           (error, result) => {
             if (error) reject(error)
@@ -148,7 +151,7 @@ export async function POST(req: NextRequest) {
     const submission = await prisma.submission.upsert({
       where: {
         studentId_activityId: {
-          studentId: user.id,
+          studentId: dbUser.id,
           activityId: activityId,
         },
       },

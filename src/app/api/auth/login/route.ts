@@ -3,6 +3,8 @@ import { db } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { sign } from 'jsonwebtoken';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
   try {
     const { email, password } = await req.json();
